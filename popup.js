@@ -15,7 +15,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const loadingDiv = document.getElementById('loading');
 
     // Default API URL - hardcoded since we removed settings
-    const API_URL = 'http://url-shortener.test/api/urls';
+    const API_URL = 'https://imbdurl.com/api/urls';
 
     // Use current page URL
     useCurrentBtn.addEventListener('click', function () {
