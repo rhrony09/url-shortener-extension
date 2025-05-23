@@ -20,12 +20,85 @@
                 <p>Processing...</p>
             </div>
 
+            <!-- Login Form -->
+            <div id="login-form" class="hidden auth-form">
+                <h2>Login</h2>
+                <div id="login-errors" class="error-list hidden"></div>
+                <div class="form-group">
+                    <input type="text" id="login-email" placeholder="Email/Mobile/Username" required>
+                </div>
+                <div class="form-group">
+                    <input type="password" id="login-password" placeholder="Password" required>
+                </div>
+                <div class="form-actions">
+                    <button id="login-submit-btn">Login</button>
+                    <button id="login-back-btn" class="secondary-btn">Back</button>
+                </div>
+            </div>
+
+            <!-- Register Form -->
+            <div id="register-form" class="hidden auth-form">
+                <h2>Register</h2>
+                <div id="register-errors" class="error-list hidden"></div>
+                <div class="form-group">
+                    <input type="text" id="register-name" placeholder="Full Name" required>
+                </div>
+                <div class="form-group">
+                    <input type="tel" id="register-mobile" placeholder="Mobile Number" required>
+                </div>
+                <div class="form-group">
+                    <input type="email" id="register-email" placeholder="Email" required>
+                </div>
+                <div class="form-group">
+                    <input type="password" id="register-password" placeholder="Password" required>
+                </div>
+                <div class="form-actions">
+                    <button id="register-submit-btn">Register</button>
+                    <button id="register-back-btn" class="secondary-btn">Back</button>
+                </div>
+            </div>
+
+            <!-- Main Content (URL Shortener) -->
             <div id="content">
+                <!-- Authentication Section - Optional -->
+                <div id="auth-section" class="auth-section-optional">
+                    <div class="auth-prompt">
+                        <p>Want to track your shortened URLs?<br><a href="#" id="show-auth-options">Login or Register</a></p>
+                    </div>
+                    <div id="auth-buttons" class="auth-buttons hidden">
+                        <button id="login-btn" class="auth-btn">Login</button>
+                        <button id="register-btn" class="auth-btn">Register</button>
+                        <button id="hide-auth-btn" class="secondary-btn">Cancel</button>
+                    </div>
+                </div>
+
+                <!-- User Info (shown when authenticated) -->
+                <div id="user-info" class="user-info hidden">
+                    <span id="user-name"></span>
+                    <div class="button-group">
+                        <button id="view-details-btn" class="view-details-btn" title="View In Dashboard">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-window-stack" viewBox="0 0 16 16">
+                                <path d="M4.5 6a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1M6 6a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1m2-.5a.5.5 0 1 1-1 0 .5.5 0 0 1 1 0" />
+                                <path d="M12 1a2 2 0 0 1 2 2 2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2 2 2 0 0 1-2-2V3a2 2 0 0 1 2-2zM2 12V5a2 2 0 0 1 2-2h9a1 1 0 0 0-1-1H2a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1m1-4v5a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V8zm12-1V5a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v2z" />
+                            </svg>
+                        </button>
+                        <button id="logout-btn" class="logout-btn" title="Logout">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M9 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                                <path d="M16 17L21 12L16 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                                <path d="M21 12H9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
                 <div id="url-input">
                     <input type="url" id="original-url" placeholder="Enter URL or use current page">
                     <input type="text" id="custom-slug" placeholder="Custom slug (optional)">
-                    <button id="shorten-btn">Shorten URL</button>
-                    <button id="use-current-btn">Use Current Page</button>
+                    <div class="form-actions">
+                        <button id="shorten-btn">Shorten URL</button>
+                        <button id="use-current-btn">Use Current Page</button>
+                    </div>
                 </div>
 
                 <div id="result" class="hidden">
