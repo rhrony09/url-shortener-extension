@@ -231,7 +231,7 @@ button:disabled:hover {
 
 .logout-btn,
 .view-details-btn {
-    background: linear-gradient(135deg, #f44336, #d32f2f);
+    background: linear-gradient(135deg, #059669 0%, #10b981 100%);
     padding: 6px;
     line-height: 0em;
     border-radius: 4px;
@@ -239,7 +239,8 @@ button:disabled:hover {
 
 .logout-btn:hover,
 .view-details-btn:hover {
-    background: linear-gradient(135deg, #d32f2f, #c62828);
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    box-shadow: 0 4px 12px rgba(65, 227, 154, 0.3);
 }
 
 .button-group svg {
@@ -288,6 +289,7 @@ button:disabled:hover {
 
 #use-current-btn:hover {
     background: linear-gradient(135deg, #5a6268, #495057);
+    box-shadow: 0 4px 12px rgba(114, 114, 114, 0.3);
 }
 
 /* Results Section */
