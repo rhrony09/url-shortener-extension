@@ -45,7 +45,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const registerBackBtn = document.getElementById('register-back-btn');
     const registerErrors = document.getElementById('register-errors');
 
-    // API URLs
+    // API URLs with HTTPS enforcement
     const BASE_URL = 'https://imbdurl.com';
     const API_URL = `${BASE_URL}/api/urls`;
     const LOGIN_API = `${BASE_URL}/api/login`;
@@ -54,12 +54,48 @@ document.addEventListener('DOMContentLoaded', function () {
     const MAGIC_TOKEN_API = `${BASE_URL}/api/get-magic-token`;
     const MAGIC_LOGIN_URL = `${BASE_URL}/magic-login`;
 
+    // Ensure all URLs use HTTPS
+    function enforceHTTPS(url) {
+        if (!url.startsWith('https://')) {
+            throw new Error('Only HTTPS URLs are allowed for security');
+        }
+        return url;
+    }
+
     // Auth state
     let authToken = null;
     let currentUser = null;
 
     // Initialize the extension
     init();
+
+    // Theme management
+    initTheme();
+
+    // Update checking
+    initUpdateChecking();
+
+    // Input sanitization function to prevent XSS
+    function sanitizeInput(input) {
+        if (typeof input !== 'string') return '';
+
+        // Remove potentially dangerous characters and scripts
+        return input
+            .replace(/[<>]/g, '') // Remove < and >
+            .replace(/javascript:/gi, '') // Remove javascript: protocol
+            .replace(/on\w+=/gi, '') // Remove event handlers
+            .trim();
+    }
+
+    // Sanitize all user inputs before processing
+    function sanitizeFormInputs() {
+        const inputs = document.querySelectorAll('input[type="text"], input[type="email"], input[type="tel"]');
+        inputs.forEach(input => {
+            input.addEventListener('input', function () {
+                this.value = sanitizeInput(this.value);
+            });
+        });
+    }
 
     // Authentication Event Listeners
     showAuthOptionsLink.addEventListener('click', function (e) {
@@ -88,6 +124,8 @@ document.addEventListener('DOMContentLoaded', function () {
         if (e.key === 'Enter') handleRegister();
     });
 
+
+
     // Existing event listeners
     useCurrentBtn.addEventListener('click', function () {
         chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
@@ -114,20 +152,33 @@ document.addEventListener('DOMContentLoaded', function () {
         shortenUrl(API_URL, originalUrl, customSlug);
     });
 
-    copyBtn.addEventListener('click', function () {
-        shortUrlInput.select();
-        document.execCommand('copy');
+    copyBtn.addEventListener('click', async function () {
+        try {
+            await navigator.clipboard.writeText(shortUrlInput.value);
 
-        const originalText = copyBtn.innerHTML;
-        copyBtn.innerHTML = `
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-          <path d="M10.97 4.97a.75.75 0 0 1 1.07 1.05l-3.99 4.99a.75.75 0 0 1-1.08.02L4.324 8.384a.75.75 0 1 1 1.06-1.06l2.094 2.093 3.473-4.425a.267.267 0 0 1 .02-.022z"/>
-        </svg>
-      `;
+            // Show success feedback
+            const originalText = copyBtn.innerHTML;
+            copyBtn.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+              <path d="M10.97 4.97a.75.75 0 0 1 1.07 1.05l-3.99 4.99a.75.75 0 0 1-1.08.02L4.324 8.384a.75.75 0 1 1 1.06-1.06l2.094 2.093 3.473-4.425a.267.267 0 0 1 .02-.022z"/>
+            </svg>
+          `;
+            copyBtn.title = 'Copied!';
 
-        setTimeout(() => {
-            copyBtn.innerHTML = originalText;
-        }, 2000);
+            setTimeout(() => {
+                copyBtn.innerHTML = originalText;
+                copyBtn.title = 'Copy to clipboard';
+            }, 2000);
+        } catch (err) {
+            // Fallback for older browsers
+            shortUrlInput.select();
+            try {
+                document.execCommand('copy');
+                showSuccessMessage('URL copied to clipboard!');
+            } catch (fallbackErr) {
+                showError('Failed to copy URL. Please copy manually.');
+            }
+        }
     });
 
     newBtn.addEventListener('click', function () {
@@ -408,9 +459,21 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    // URL Shortener Functions
+    // URL Shortener Functions with timeout handling
     function shortenUrl(apiUrl, originalUrl, customSlug) {
         showLoading(true);
+
+        // Validate and sanitize inputs
+        try {
+            originalUrl = enforceHTTPS(originalUrl);
+            if (customSlug) {
+                customSlug = sanitizeInput(customSlug);
+            }
+        } catch (error) {
+            showLoading(false);
+            showError(error.message, error);
+            return;
+        }
 
         const data = {
             original_url: originalUrl,
@@ -434,12 +497,23 @@ document.addEventListener('DOMContentLoaded', function () {
             headers['Authorization'] = `Bearer ${authToken}`;
         }
 
+        // Create AbortController for timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
         fetch(apiUrl, {
             method: 'POST',
             headers: headers,
-            body: JSON.stringify(data)
+            body: JSON.stringify(data),
+            signal: controller.signal
         })
-            .then(response => response.json())
+            .then(response => {
+                clearTimeout(timeoutId);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                return response.json();
+            })
             .then(data => {
                 showLoading(false);
 
@@ -450,16 +524,71 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             })
             .catch(error => {
+                clearTimeout(timeoutId);
                 showLoading(false);
-                showError('Failed to connect to the server. Please try again.');
+
+                if (error.name === 'AbortError') {
+                    showError('Request timed out. Please try again.');
+                } else if (error.message.includes('HTTP')) {
+                    showError(`Server error: ${error.message}`);
+                } else {
+                    showError('Failed to connect to the server. Please try again.', error);
+                }
                 console.error('Error:', error);
             });
     }
 
-    function showError(message) {
-        errorText.textContent = message;
+    // Enhanced error handling with error boundaries
+    function showError(message, error = null) {
+        // Log error for debugging
+        if (error) {
+            console.error('Extension Error:', error);
+        }
+
+        // Sanitize error message to prevent XSS
+        const sanitizedMessage = sanitizeInput(message);
+        errorText.textContent = sanitizedMessage;
         errorDiv.classList.remove('hidden');
         urlInputDiv.classList.add('hidden');
+
+        // Auto-hide error after 10 seconds
+        setTimeout(() => {
+            if (!errorDiv.classList.contains('hidden')) {
+                errorDiv.classList.add('hidden');
+                urlInputDiv.classList.remove('hidden');
+            }
+        }, 10000);
+    }
+
+    // Success message function
+    function showSuccessMessage(message) {
+        // Create temporary success message
+        const successDiv = document.createElement('div');
+        successDiv.className = 'success-message';
+        successDiv.textContent = message;
+        successDiv.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #4caf50;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 10000;
+            animation: slideInRight 0.3s ease-out;
+        `;
+
+        document.body.appendChild(successDiv);
+
+        setTimeout(() => {
+            successDiv.style.animation = 'slideOutRight 0.3s ease-out';
+            setTimeout(() => {
+                if (successDiv.parentNode) {
+                    successDiv.parentNode.removeChild(successDiv);
+                }
+            }, 300);
+        }, 3000);
     }
 
     function showLoading(isLoading) {
@@ -507,5 +636,156 @@ document.addEventListener('DOMContentLoaded', function () {
         contentDiv.classList.remove('hidden');
         updateAuthDisplay();
         initUrlShortener();
+
+        // Initialize input sanitization and validation
+        sanitizeFormInputs();
+        setupRealTimeValidation();
+
+        // Apply theme immediately after DOM is ready
+        setTimeout(() => {
+            const savedTheme = localStorage.getItem('theme');
+            const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+            if (savedTheme) {
+                setTheme(savedTheme);
+            } else if (systemPrefersDark) {
+                setTheme('dark');
+            } else {
+                setTheme('light');
+            }
+        }, 100);
     }
+
+    // Theme management functions
+    function initTheme() {
+        const themeToggle = document.getElementById('theme-toggle');
+        const sunIcon = document.getElementById('sun-icon');
+        const moonIcon = document.getElementById('moon-icon');
+
+        // Check if elements exist
+        if (!themeToggle || !sunIcon || !moonIcon) {
+            return;
+        }
+
+        // Load saved theme or detect system preference
+        const savedTheme = localStorage.getItem('theme');
+        const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+        if (savedTheme) {
+            setTheme(savedTheme);
+        } else if (systemPrefersDark) {
+            setTheme('dark');
+        } else {
+            setTheme('light'); // Ensure light theme is set by default
+        }
+
+        // Theme toggle event listener
+        themeToggle.addEventListener('click', () => {
+            const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            setTheme(newTheme);
+            localStorage.setItem('theme', newTheme);
+        });
+
+        // Listen for system theme changes
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+            if (!localStorage.getItem('theme')) {
+                setTheme(e.matches ? 'dark' : 'light');
+            }
+        });
+
+
+    }
+
+
+
+    function setTheme(theme) {
+        const sunIcon = document.getElementById('sun-icon');
+        const moonIcon = document.getElementById('moon-icon');
+
+        // Set the theme attribute on document element
+        document.documentElement.setAttribute('data-theme', theme);
+
+        // Update icon visibility
+        if (theme === 'dark') {
+            sunIcon.classList.add('hidden');
+            moonIcon.classList.remove('hidden');
+        } else {
+            sunIcon.classList.remove('hidden');
+            moonIcon.classList.add('hidden');
+        }
+
+
+    }
+
+    // Real-time input validation
+    function setupRealTimeValidation() {
+        const urlInput = document.getElementById('original-url');
+        const slugInput = document.getElementById('custom-slug');
+
+        // URL validation
+        urlInput.addEventListener('input', function () {
+            const url = this.value.trim();
+            if (url && !isValidUrl(url)) {
+                this.style.borderColor = '#f44336';
+                this.title = 'Please enter a valid URL (e.g., https://example.com)';
+            } else {
+                this.style.borderColor = '#e1e5e9';
+                this.title = '';
+            }
+        });
+
+        // Slug validation
+        slugInput.addEventListener('input', function () {
+            const slug = this.value.trim();
+            if (slug && !/^[a-zA-Z0-9-_]+$/.test(slug)) {
+                this.style.borderColor = '#f44336';
+                this.title = 'Slug can only contain letters, numbers, hyphens, and underscores';
+            } else {
+                this.style.borderColor = '#e1e5e9';
+                this.title = '';
+            }
+        });
+    }
+
+    // Update checking functions
+    function initUpdateChecking() {
+        // Check for updates when popup opens
+        checkForUpdates();
+
+        // Add version info to the popup if you want to display it
+        displayVersionInfo();
+    }
+
+    async function checkForUpdates() {
+        try {
+            // Send message to background script to check for updates
+            const response = await chrome.runtime.sendMessage({ action: 'checkForUpdates' });
+
+            if (response && response.success) {
+                console.log('Update check completed');
+            }
+        } catch (error) {
+            console.error('Error checking for updates:', error);
+        }
+    }
+
+    async function displayVersionInfo() {
+        try {
+            const response = await chrome.runtime.sendMessage({ action: 'getVersion' });
+
+            if (response && response.version) {
+                // You can add this to your popup HTML if you want to show the version
+                // For example, add a version element and update it here
+                const versionElement = document.getElementById('version-info');
+                if (versionElement) {
+                    versionElement.textContent = `v${response.version}`;
+                }
+            }
+        } catch (error) {
+            console.error('Error getting version info:', error);
+        }
+    }
+
+
 });

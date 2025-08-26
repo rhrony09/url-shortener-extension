@@ -5,8 +5,16 @@
     "description": "Quickly create shortened URLs using IMBD Shortener with user authentication",
     "permissions": [
         "tabs",
-        "storage"
+        "storage",
+        "clipboardWrite",
+        "notifications"
     ],
+    "content_security_policy": {
+        "extension_pages": "script-src 'self'; object-src 'self'; connect-src https://imbdurl.com;"
+    },
+    "background": {
+        "service_worker": "background.js"
+    },
     "action": {
         "default_popup": "popup.html",
         "default_icon": {
